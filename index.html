@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>SSSACAD — Report Card System</title>
+
+<!-- PWA setup -->
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#142544">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="SSSACAD">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512.png">
+
+<style>
+  :root{
+    /* ---- New design language, matched to the reference dashboard: a
+       cohesive navy + blue identity instead of the old per-tab rainbow
+       theme, white cards on a cool light background, and a small set of
+       semantic colors (success/danger/warning/purple/orange) used for
+       status and category, not for re-theming whole screens. ---- */
+    --navy:#142544; --navy-2:#1c3766; --brand:#2f6feb; --brand-light:#e9f1fd;
+    --bg:#eef2f8; --card:#ffffff; --text:#16233d; --muted:#6b7688; --border:#e4e9f2;
+    --success:#1fa971; --success-bg:#e2f8ee;
+    --danger:#e2507b; --danger-bg:#fdeaf1;
+    --warning:#f2a93b; --warning-bg:#fdf1dd;
+    --purple:#7c5cfc; --purple-bg:#efeafe;
+    --orange:#f0904a; --orange-bg:#fdece0;
+
+    /* Legacy variable names kept as aliases so every existing inline
+       style in the JS files (var(--green), var(--gold), var(--tabAccent),
+       etc.) keeps working without touching those files — they now all
+       resolve into the one consistent palette above instead of a
+       different color per tab. */
+    --green:var(--brand); --green-dark:var(--navy); --gold:var(--warning); --red:var(--danger); --blue:var(--brand-light);
+    --tabAccent:var(--brand); --tabAccentBg:var(--brand-light); --tabAccentDark:var(--navy);
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:-apple-system,Roboto,"Segoe UI",Arial,sans-serif;background:var(--bg);color:var(--text);position:relative;}
+  body::before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;
+    background-image:url('icons/logo.png');background-repeat:repeat;background-size:90px 90px;opacity:.03;}
+  header{background:var(--navy);color:#fff;padding:14px 16px;position:fixed;top:0;left:0;right:0;z-index:30;box-shadow:0 2px 10px rgba(16,35,64,.18);}
+  header h1{margin:0;font-size:16px;font-weight:700;}
+  header p{margin:2px 0 0;font-size:11px;opacity:.8;}
+  nav{display:flex;gap:4px;overflow-x:auto;-webkit-overflow-scrolling:touch;background:var(--navy-2);position:fixed;left:0;right:0;z-index:29;padding:6px 8px;}
+  nav button{flex:0 0 auto;background:none;border:none;color:#fff;padding:9px 14px;font-size:13px;opacity:.75;white-space:nowrap;border-radius:9px;font-weight:600;}
+  nav button.active{opacity:1;background:var(--brand);}
+  main{padding:150px 12px 60px;max-width:900px;margin:0 auto;}
+  .tab{display:none;}
+  .tab.active{display:block;}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:16px;margin-bottom:12px;box-shadow:0 1px 3px rgba(16,35,64,.05);}
+  .card h2{margin:0 0 10px;font-size:15px;color:var(--text);font-weight:700;}
+  @media print{ .card{background:#fff !important;box-shadow:none !important;} }
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+  label{display:block;font-size:12px;color:var(--muted);margin-bottom:4px;margin-top:8px;font-weight:600;}
+  input,select{width:100%;padding:9px 10px;border:1px solid var(--border);border-radius:9px;font-size:14px;background:#fff;color:var(--text);}
+  input:focus,select:focus{outline:2px solid var(--brand);outline-offset:1px;}
+  button.btn{background:var(--brand);color:#fff;border:none;padding:11px 16px;border-radius:10px;font-size:14px;font-weight:600;margin-top:12px;width:100%;}
+  button.btn.secondary{background:#fff;color:var(--brand);border:1px solid var(--brand);}
+  button.btn.danger{background:var(--danger);}
+  button.btn.small{width:auto;padding:6px 10px;font-size:12px;margin-top:0;border-radius:8px;}
+  .row{display:flex;gap:8px;}
+  .row>*{flex:1;}
+  table{width:100%;border-collapse:collapse;font-size:12.5px;}
+  th,td{padding:7px 6px;text-align:left;border-bottom:1px solid var(--border);}
+  th{color:var(--muted);font-size:11.5px;font-weight:700;}
+  .enroll-row td{background:var(--brand-light);border-bottom:2px solid var(--brand);}
+  .link-btn:hover{text-decoration:underline;}
+  .badge{display:inline-block;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;}
+  .badge.gA{background:var(--success-bg);color:var(--success);}
+  .badge.gB{background:var(--success-bg);color:var(--success);}
+  .badge.gC{background:var(--warning-bg);color:#9a6c10;}
+  .badge.gD{background:var(--orange-bg);color:#a05516;}
+  .badge.gE{background:var(--danger-bg);color:var(--danger);}
+  .badge.gF{background:var(--danger-bg);color:var(--danger);}
+  .stat{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px dashed var(--border);font-size:13.5px;}
+  .stat b{color:var(--text);}
+  .studentcard{padding:12px;border:1px solid var(--border);border-radius:12px;margin-bottom:8px;background:#fff;}
+  .studentcard .toprow{display:flex;justify-content:space-between;align-items:center;cursor:pointer;}
+  .studentcard b{font-size:14px;}
+  .studentcard .meta{font-size:12px;color:var(--muted);margin-top:2px;}
+  .rank-pill{display:inline-flex;align-items:center;justify-content:center;min-width:26px;height:26px;border-radius:50%;background:var(--brand);color:#fff;font-weight:700;font-size:12px;margin-right:10px;}
+
+  /* ---- Student name tags: colour-coded avatar + name, reused across
+     Students, Register, Score Entry and Class Report so a given student
+     carries the same colour everywhere they appear ---- */
+  .tag-avatar{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:50%;font-size:10.5px;font-weight:800;letter-spacing:.2px;flex:0 0 auto;}
+  .student-tag{display:inline-flex;align-items:center;gap:7px;max-width:100%;vertical-align:middle;}
+  .student-tag .tag-name{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .student-tag .tag-gender{flex:0 0 auto;display:inline-flex;opacity:.8;}
+  .tag-staggered{display:inline-flex;margin-left:6px;color:var(--warning);opacity:.9;vertical-align:middle;}
+  td .student-tag, .link-btn .student-tag{max-width:100%;}
+
+  /* ---- Drag-and-drop reordering (Students tab) ---- */
+  .drag-handle{flex:0 0 auto;display:inline-flex;align-items:center;padding:4px 3px;margin-right:2px;color:var(--muted);cursor:grab;touch-action:none;}
+  .drag-handle:active{cursor:grabbing;}
+  .student-row{transition:background-color .15s;border-radius:8px;}
+  .student-row.dragging{opacity:.55;background:var(--brand-light);}
+  .detail{display:none;margin-top:10px;border-top:1px solid var(--border);padding-top:10px;}
+  .detail.open{display:block;}
+  .section-title{font-size:12px;font-weight:700;color:var(--text);margin:14px 0 4px;letter-spacing:.2px;}
+  .empty{color:var(--muted);font-size:13px;padding:16px 0;text-align:center;}
+  .toast{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);background:var(--navy);color:#fff;padding:10px 18px;border-radius:20px;font-size:13px;z-index:100;opacity:0;transition:opacity .25s;pointer-events:none;}
+  .toast.show{opacity:1;}
+  .subtable-wrap{overflow-x:auto;}
+  .comment-box{background:var(--brand-light);border-radius:10px;padding:10px 12px;font-size:13px;color:var(--navy);margin-top:10px;}
+
+  /* ---- Everything in capitals (typed text is also converted as it's entered — see the input handler below).
+     .no-caps opts a field out: access codes and the sync URL are case-sensitive. ---- */
+  body,input,textarea,select,button{text-transform:uppercase;}
+  .no-caps,.no-caps *,input[type=password],input[type=file]{text-transform:none !important;}
+
+  /* Timestamp stamped onto every printed / exported document (Report Card, Class Report,
+     Broadsheet, PDF export). Invisible on screen; shown fixed at the foot of every printed
+     page by the browser's print engine — including multi-page prints. */
+  #printStamp{display:none;}
+  @media print{
+    #printStamp{display:block !important;position:fixed;left:0;right:0;bottom:3mm;
+      text-align:center;font-size:7.5px;letter-spacing:.2px;color:#666;z-index:99999;}
+  }
+  #classBar{background:#fff;border-bottom:1px solid var(--border);padding:8px 12px;position:fixed;left:0;right:0;z-index:28;display:flex;gap:8px;align-items:center;max-width:900px;margin:0 auto;box-shadow:0 1px 3px rgba(16,35,64,.04);}
+  #classBar button{white-space:nowrap;}
+
+  /* ---- Login gate: full-screen class picker + access-code / admin front
+     door, shown before any class's data is visible (see login.js) ---- */
+
+  /* Scrolling notice on the class-select screen: right to left, edge to edge. */
+  .gate-marquee{position:fixed;left:0;right:0;top:0;z-index:501;overflow:hidden;
+    background:var(--navy);color:#fff;padding:7px 0;font-size:12.5px;font-weight:700;letter-spacing:.3px;
+    white-space:nowrap;pointer-events:none;}
+  /* translateX(100%) start (just off the right edge) to translateX(-100%) end (fully past the left edge)
+     guarantees the whole line crosses and clears the entire screen width, at whatever the element's own
+     width turns out to be — not tied to a fixed pixel amount. */
+  .gate-marquee span{display:inline-block;white-space:nowrap;animation:gateMarquee 24s linear infinite;
+    transform:translateX(100%);}
+  @keyframes gateMarquee{from{transform:translateX(100%);}to{transform:translateX(-100%);}}
+  #loginGate{display:none;position:fixed;inset:0;z-index:500;align-items:center;justify-content:center;padding:24px 16px;overflow-y:auto;
+    background:linear-gradient(rgba(255,255,255,.80),rgba(255,255,255,.80)),url(icons/school-bg.jpg) center/cover no-repeat,#f4f6fb;}
+  .gate-card{background:rgba(255,255,255,.62);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);border:1px solid rgba(255,255,255,.85);border-radius:22px;padding:24px 18px 18px;max-width:380px;width:100%;text-align:center;box-shadow:0 18px 48px rgba(20,37,68,.22);}
+  .gate-logo{width:56px;height:56px;border-radius:14px;margin-bottom:8px;}
+  .gate-title{margin:0;font-size:18px;font-weight:800;color:var(--navy);}
+  .gate-sub{margin:4px 0 18px;font-size:13px;color:var(--muted);}
+  .gate-class-list{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:4px;}
+  .gate-class-btn{position:relative;display:flex;align-items:center;justify-content:center;min-height:52px;padding:10px 4px;border:1px solid rgba(20,37,68,.10);border-radius:14px;background:rgba(255,255,255,.94);color:var(--navy);font-size:14px;font-weight:800;letter-spacing:.4px;white-space:nowrap;box-shadow:0 4px 10px rgba(20,37,68,.14),0 1px 2px rgba(20,37,68,.10);transition:transform .12s,box-shadow .12s;}
+  @keyframes gateClassPop{from{opacity:0;transform:translateY(8px) scale(.85);}to{opacity:1;transform:none;}}
+  .gate-class-btn{opacity:0;animation:gateClassPop .3s ease-out forwards;}
+  .gate-class-btn.selected{background:var(--brand);border-color:var(--brand);color:#fff;transform:scale(.97);}
+  @media (prefers-reduced-motion:reduce){.gate-class-btn{animation-duration:.01s;}}
+  .gate-class-btn:active{transform:translateY(1px) scale(.97);background:var(--brand-light);border-color:var(--brand);box-shadow:0 1px 3px rgba(20,37,68,.18);}
+  .gate-lock{position:absolute;top:3px;right:5px;opacity:.5;font-size:9px;}
+  .gate-admin-link{display:inline-block;margin-top:16px;background:none;border:none;color:var(--muted);font-size:12.5px;font-weight:700;text-decoration:underline;padding:6px;}
+  .gate-back-link{display:block;width:100%;background:none;border:none;color:var(--muted);font-size:12.5px;font-weight:600;text-decoration:underline;margin-top:14px;padding:6px;}
+  .gate-pin-row{display:flex;gap:8px;justify-content:center;margin:4px 0;flex-wrap:wrap;}
+  .gate-pin-box{width:40px;height:50px;text-align:center;font-size:22px;font-weight:700;border:1.5px solid var(--border);border-radius:10px;padding:0;}
+  .gate-pin-box:focus{border-color:var(--brand);outline:2px solid var(--brand-light);}
+  .modal-overlay{position:fixed;inset:0;background:rgba(16,25,44,.55);z-index:200;display:flex;align-items:center;justify-content:center;padding:20px;}
+  @keyframes ringPulse{0%,100%{transform:scale(1);}50%{transform:scale(1.015);}}
+  .ring-banner{position:fixed;top:0;left:0;right:0;z-index:300;background:linear-gradient(90deg,var(--warning),#f7c15f);color:#5a3c05;padding:14px 16px;font-size:14px;font-weight:700;display:flex;align-items:center;justify-content:space-between;box-shadow:0 3px 10px rgba(0,0,0,.2);animation:ringPulse 1s ease-in-out 3;}
+  .ring-banner button{background:none;border:none;color:#5a3c05;font-size:16px;font-weight:700;cursor:pointer;padding:0 4px;}
+  .modal-box{background:#fff;border-radius:16px;padding:18px;max-width:340px;width:100%;}
+  .modal-box h3{margin:0 0 10px;font-size:15px;color:var(--navy);}
+  .modal-box ol{margin:0 0 14px;padding-left:20px;font-size:13.5px;line-height:1.6;}
+  .modal-box button{width:100%;}
+  .sync-status-pill{display:inline-flex;align-items:center;gap:6px;margin-top:10px;padding:7px 12px;border-radius:20px;font-size:12.5px;font-weight:600;background:var(--border);color:var(--muted);}
+  .sync-status-pill:empty{display:none;}
+  .sync-status-pill.tone-success{background:var(--success-bg);color:var(--success);}
+  .sync-status-pill.tone-progress{background:var(--brand-light);color:var(--brand);}
+  .sync-status-pill.tone-warning{background:var(--warning-bg);color:#9a6c10;}
+  .sync-status-pill.tone-error{background:var(--danger-bg);color:var(--danger);}
+
+
+  /* ---- Report sheet: faithful reproduction of the paper template ---- */
+  .reportsheet{font-family:Georgia,'Times New Roman',serif;color:#000;border:2px solid #000;background:#fff;margin-bottom:12px;position:relative;overflow:hidden;}
+  .reportsheet::before{content:"";position:absolute;inset:0;background-image:url('icons/logo.png');background-repeat:no-repeat;background-position:center;background-size:42% auto;opacity:.08;z-index:0;pointer-events:none;}
+  .reportsheet>*{position:relative;z-index:1;}
+  .rs-header{background:#7d4f9e;color:#fff;text-align:center;padding:10px 6px;border-bottom:2px solid #000;}
+  .rs-schoolname{font-size:15px;font-weight:700;letter-spacing:.3px;}
+  .rs-motto{font-size:11px;margin-top:2px;}
+  .rs-title{text-align:center;font-weight:700;font-size:13.5px;padding:10px 6px;border-bottom:2px solid #000;}
+  .rs-title u{text-underline-offset:2px;}
+  .rs-info-grid{display:grid;grid-template-columns:1fr 1fr;gap:0;border-bottom:2px solid #000;}
+  .rs-info-col{padding:8px 10px;}
+  .rs-info-col:first-child{border-right:1px solid #000;}
+  .rs-info-row{display:flex;justify-content:space-between;gap:6px;font-size:12px;font-weight:700;padding:3px 0;border-bottom:1px dotted #999;}
+  .rs-info-row b{font-weight:700;text-align:right;}
+  .rs-table{width:100%;border-collapse:collapse;font-size:10.5px;}
+  .rs-table th,.rs-table td{border:1px solid #000;padding:4px 5px;text-align:center;}
+  .rs-table thead tr.rs-maxrow th{background:#9b6bc0;color:#fff;font-size:9.5px;}
+  .rs-table thead tr:last-child th{background:#d9c3e8;color:#3a1d4d;font-size:9.5px;}
+  .rs-table td.rs-subj{text-align:left;}
+  .rs-remarks{border-top:2px solid #000;}
+  .rs-remark-row{display:flex;border-bottom:1px solid #000;font-size:11.5px;}
+  .rs-remark-row b{flex:0 0 110px;padding:8px;border-right:1px solid #000;background:#f1e6f7;}
+  .rs-remark-line{flex:1;padding:8px;}
+  .rs-keys{font-size:10px;padding:8px 10px;border-top:2px solid #000;}
+  @media print{ .reportsheet{border-color:#000;} .rs-table thead th, .rs-remark-row b{-webkit-print-color-adjust:exact;print-color-adjust:exact;} .rs-header{background:#7d4f9e !important;-webkit-print-color-adjust:exact;print-color-adjust:exact;} .reportsheet::before{-webkit-print-color-adjust:exact;print-color-adjust:exact;} }
+
+  /* ---- Broadsheet: wide class-summary table, printed A4 landscape ---- */
+  .bs-wrap{border:2px solid #000;background:#fff;font-family:Georgia,'Times New Roman',serif;color:#000;position:relative;overflow:hidden;}
+  .bs-wrap::before{content:"";position:absolute;inset:0;background-image:url('icons/logo.png');background-repeat:no-repeat;background-position:center;background-size:32% auto;opacity:.07;z-index:0;pointer-events:none;}
+  .bs-wrap>*{position:relative;z-index:1;}
+  .bs-heading{text-align:center;padding:10px 6px;border-bottom:2px solid #000;}
+  .bs-heading .bs-school{font-size:15px;font-weight:700;}
+  .bs-heading .bs-sub{font-size:12px;margin-top:3px;}
+  .bs-table{width:100%;border-collapse:collapse;font-size:9px;}
+  .bs-table th,.bs-table td{border:1px solid #000;padding:3px 4px;text-align:center;white-space:nowrap;}
+  .bs-table td.bs-name{text-align:left;white-space:normal;}
+  .bs-table thead th{background:#d9c3e8;color:#3a1d4d;}
+  .bs-table thead tr:first-child th{background:#9b6bc0;color:#fff;}
+  .bs-table tbody tr:nth-child(even){background:#faf7fc;}
+  @page { size: A4 portrait; margin: 12mm; }
+  @page broadsheet-page { size: A4 landscape; margin: 10mm; }
+  #broadsheet{ page: broadsheet-page; }
+  @media print{
+    #broadsheet .bs-table{font-size:8px;}
+    .bs-wrap::before,.bs-table thead tr:first-child th,.bs-table thead th{-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+  }
+
+  /* ---- Print preview modal ---- */
+  .preview-overlay{align-items:stretch;justify-content:stretch;padding:0;background:rgba(20,10,25,.75);}
+  .preview-box{background:#e9e2ee;width:100%;height:100%;display:flex;flex-direction:column;}
+  .preview-toolbar{background:var(--green-dark);color:#fff;padding:10px 14px;display:flex;justify-content:space-between;align-items:center;font-size:13px;font-weight:700;}
+  .preview-toolbar button{margin-top:0;margin-left:6px;}
+  .preview-scroll{flex:1;overflow:auto;padding:20px;display:flex;flex-direction:column;align-items:center;gap:16px;}
+  .preview-page{background:#fff;box-shadow:0 3px 14px rgba(0,0,0,.35);max-width:100%;overflow:hidden;flex:0 0 auto;}
+
+  /* ---- Broadsheet pagination (screen preview of print page breaks) ---- */
+  .bs-page-wrap{margin-bottom:14px;}
+  .bs-page-break{page-break-after:always;break-after:page;}
+  .bs-page{font-size:10px;margin-top:2px;font-weight:700;}
+  /* ---- Print-only container used by the preview's Print button (see printPagesNow in ui.js) ---- */
+  #printRoot{display:none;}
+  @media print{
+    body.printing-preview > *:not(#printRoot):not(#printStamp){display:none !important;}
+    body.printing-preview #printRoot{display:block !important;}
+    #printRoot .print-page-break{page-break-after:always;break-after:page;}
+    #printRoot .subtable-wrap{overflow:visible !important;}
+    #printRoot .export-page table{font-size:9px;}
+    #printRoot .bs-table{font-size:8px;}
+  }
+  @media print{
+    header, nav, #classBar, #loginGate, .no-print{display:none !important;}
+    main{padding:0 !important;max-width:none;}
+    .tab{display:none !important;}
+    .tab.active{display:block !important;}
+    body{background:#fff;}
+  }
+</style>
+</head>
+<body class="theme-students">
+
+<div id="loginGate" class="no-print"></div>
+<div id="printStamp"></div>
+
+<header>
+  <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;">
+    <div style="display:flex;align-items:center;gap:10px;">
+      <img src="icons/logo.png" alt="School logo" style="width:42px;height:42px;flex:0 0 auto;">
+      <div>
+        <h1>SSSACAD</h1>
+        <p>St. Stephen's Nursery, Primary and Secondary School — Report Card System <span id="appVersionBadge" style="opacity:.8;"></span></p>
+        <p id="liveClock" class="no-caps" style="margin:2px 0 0;font-size:11px;font-weight:700;color:var(--brand);"></p>
+      </div>
+    </div>
+    <button id="installAppBtn" class="no-print" style="flex:0 0 auto;background:var(--brand);color:#fff;border:none;padding:8px 14px;border-radius:9px;font-size:12px;font-weight:700;white-space:nowrap;">⬇ Install</button>
+  </div>
+</header>
+
+<nav id="tabs">
+  <button data-tab="students" class="active">Students</button>
+  <button data-tab="registertab">Register</button>
+  <button data-tab="scoreentry">Score Entry</button>
+  <button data-tab="classreport">Class Report</button>
+  <button data-tab="reportcard">Report Card</button>
+  <button data-tab="broadsheet">Broadsheet</button>
+  <button data-tab="admintab">Admin</button>
+</nav>
+
+<div id="classBar" class="no-print"></div>
+
+<main>
+  <div id="students" class="tab active" data-theme="theme-students"></div>
+  <div id="registertab" class="tab" data-theme="theme-registertab"></div>
+  <div id="scoreentry" class="tab" data-theme="theme-scoreentry"></div>
+  <div id="classreport" class="tab" data-theme="theme-classreport"></div>
+  <div id="reportcard" class="tab" data-theme="theme-reportcard"></div>
+  <div id="broadsheet" class="tab" data-theme="theme-broadsheet"></div>
+  <div id="admintab" class="tab" data-theme="theme-admintab"></div>
+</main>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* Force capitals for anything typed into a text box or note. Case-sensitive fields opt out with class "no-caps". */
+document.addEventListener("input", function (e) {
+  var t = e.target;
+  if (!t || t.classList.contains("no-caps")) return;
+  var isText = (t.tagName === "INPUT" && (!t.type || t.type === "text" || t.type === "search")) || t.tagName === "TEXTAREA";
+  if (!isText) return;
+  var up = t.value.toUpperCase();
+  if (up === t.value) return;
+  var a = t.selectionStart, b = t.selectionEnd;
+  t.value = up;
+  try { t.setSelectionRange(a, b); } catch (err) {}
+}, true);
+</script>
+<script src="version.js"></script>
+<script src="app.js"></script>
+<script src="history.js"></script>
+<script src="ui.js"></script>
+<script src="login.js"></script>
+<script src="sync.js"></script>
+<script src="qr.js"></script>
+<script src="qrdec.js"></script>
+<script src="localsync.js"></script>
+<script src="admin.js"></script>
+<script src="promote.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="export.js"></script>
+<script>
+  /* ---- Offline support + automatic update detection ----
+     The service worker is re-checked whenever the app comes back to the
+     screen, when the internet returns, and every 30 minutes. If a newer
+     version has been uploaded, a green bar offers "Update now" — nothing
+     reloads by itself, so nobody loses a half-typed score. */
+  function showUpdateBanner() {
+    if (document.getElementById("updateBanner")) return;
+    const bar = document.createElement("div");
+    bar.id = "updateBanner";
+    bar.style.cssText = "position:fixed;left:12px;right:12px;bottom:12px;z-index:99999;background:#1e6b3c;color:#fff;" +
+      "padding:12px 14px;border-radius:10px;box-shadow:0 4px 16px rgba(0,0,0,.3);display:flex;gap:10px;" +
+      "align-items:center;justify-content:space-between;font-size:14px;";
+    bar.innerHTML = '<span>A new version is ready.</span>' +
+      '<span><button id="updateNowBtn" style="background:#fff;color:#1e6b3c;border:0;border-radius:6px;padding:7px 12px;font-weight:600;">Update now</button> ' +
+      '<button id="updateLaterBtn" style="background:transparent;color:#fff;border:0;padding:7px 8px;">Later</button></span>';
+    document.body.appendChild(bar);
+    document.getElementById("updateNowBtn").addEventListener("click", () => location.reload());
+    document.getElementById("updateLaterBtn").addEventListener("click", () => bar.remove());
+  }
+
+  if ("serviceWorker" in navigator) {
+    let hadController = !!navigator.serviceWorker.controller; // false on the very first install
+    navigator.serviceWorker.addEventListener("controllerchange", () => {
+      if (hadController) showUpdateBanner();
+      hadController = true;
+    });
+    window.addEventListener("load", () => {
+      navigator.serviceWorker.register("service-worker.js", { updateViaCache: "none" }).then((reg) => {
+        const checkForUpdate = () => { if (navigator.onLine) reg.update().catch(() => {}); };
+        document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") checkForUpdate(); });
+        window.addEventListener("online", checkForUpdate);
+        setInterval(checkForUpdate, 30 * 60 * 1000);
+      }).catch((err) => {
+        console.warn("Service worker registration failed:", err);
+      });
+    });
+  }
+
+  let deferredInstallPrompt = null;
+  window.addEventListener("beforeinstallprompt", (event) => {
+    event.preventDefault();
+    deferredInstallPrompt = event;
+  });
+
+  function isStandalone() {
+    return window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone === true;
+  }
+
+  function showInstallInstructions() {
+    const ua = navigator.userAgent;
+    const isIOS = /iPad|iPhone|iPod/.test(ua);
+    const isAndroid = /Android/.test(ua);
+    let steps;
+    if (isIOS) {
+      steps = ["Tap the Share icon (square with an arrow) in Safari's toolbar",
+        'Scroll down and tap "Add to Home Screen"', "Tap \"Add\" in the top right"];
+    } else if (isAndroid) {
+      steps = ["Tap the ⋮ menu in the top right of Chrome",
+        'Tap "Add to Home screen" or "Install app"', "Confirm — the app icon appears on your home screen"];
+    } else {
+      steps = ["Look for an install icon (⊕) in the browser's address bar",
+        'Or open the browser menu and choose "Install St Stephen\'s Report Card..."',
+        "Confirm — the app opens in its own window like a desktop app"];
+    }
+    const overlay = document.createElement("div");
+    overlay.className = "modal-overlay";
+    overlay.innerHTML = `
+      <div class="modal-box">
+        <h3>Install this app</h3>
+        <ol>${steps.map((s) => `<li>${s}</li>`).join("")}</ol>
+        <button class="btn secondary" id="closeInstallModal">Got it</button>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+    overlay.addEventListener("click", (e) => { if (e.target === overlay) overlay.remove(); });
+    document.getElementById("closeInstallModal").addEventListener("click", () => overlay.remove());
+  }
+
+  document.addEventListener("DOMContentLoaded", () => {
+    const installBtn = document.getElementById("installAppBtn");
+    if (!installBtn) return;
+    if (isStandalone()) {
+      installBtn.style.display = "none"; // already installed/running as an app
+      return;
+    }
+    installBtn.addEventListener("click", async () => {
+      if (deferredInstallPrompt) {
+        deferredInstallPrompt.prompt();
+        await deferredInstallPrompt.userChoice;
+        deferredInstallPrompt = null;
+      } else {
+        showInstallInstructions();
+      }
+    });
+  });
+</script>
+</body>
+</html>
